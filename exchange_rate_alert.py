@@ -11,7 +11,9 @@ Usage:
 """
 
 import argparse
+import json
 import logging
+import os
 import requests
 from requests.exceptions import HTTPError
 
@@ -19,6 +21,17 @@ format = "%(asctime)s: %(levelname)s: %(message)s"
 logging.basicConfig(format=format, level=logging.INFO, datefmt="%H:%M:%S")
 
 bnm_uri = "https://api.bnm.gov.my/public/kl-usd-reference-rate"
+exchange_rate_file_txt = "exchange_rate.txt"
+
+
+def record_exchange_rate_to_file(filename, data):
+    if os.path.isfile(filename):
+        with open(filename, "a") as f:
+            f.write("\n" + data)
+    else:
+        with open(filename, "w") as f:
+            f.write(data)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -49,9 +62,11 @@ if __name__ == "__main__":
         logging.error(f"Other error occurred: {err}")
     else:
         logging.debug("Request succeeded")
+        record_exchange_rate_to_file(exchange_rate_file_txt, json.dumps(json_response))
         logging.debug(json_response)
         current_exchange_rate = float(json_response["data"]["rate"])
         if current_exchange_rate >= target_exchange_rate:
+            record_exchange_rate_to_file(exchange_rate_file_txt, f"ALERT!!! TargetExchangeRate={target_exchange_rate},CurrentExchangeRate={current_exchange_rate}")
             logging.info(
                 f"ALERT!!! TargetExchangeRate={target_exchange_rate},CurrentExchangeRate={current_exchange_rate}"
             )
