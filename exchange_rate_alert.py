@@ -16,12 +16,18 @@ import logging
 import os
 import requests
 from requests.exceptions import HTTPError
+import subprocess
 
 format = "%(asctime)s: %(levelname)s: %(message)s"
 logging.basicConfig(format=format, level=logging.INFO, datefmt="%H:%M:%S")
 
-bnm_uri = "https://api.bnm.gov.my/public/kl-usd-reference-rate"
-exchange_rate_file_txt = "exchange_rate.txt"
+BNM_URI = "https://api.bnm.gov.my/public/kl-usd-reference-rate"
+EXCHANGE_RATE_TXT = "exchange_rate.txt"
+NOTIFICATION_CMD = """
+on run argv
+  display notification (item 2 of argv) with title (item 1 of argv)
+end run
+"""
 
 
 def record_exchange_rate_to_file(filename, data):
@@ -31,6 +37,10 @@ def record_exchange_rate_to_file(filename, data):
     else:
         with open(filename, "w") as f:
             f.write(data)
+
+
+def notify_macos(title, text):
+    subprocess.call(["osascript", "-e", NOTIFICATION_CMD, title, text])
 
 
 if __name__ == "__main__":
@@ -49,7 +59,7 @@ if __name__ == "__main__":
 
     try:
         response = requests.get(
-            bnm_uri,
+            BNM_URI,
             headers={"Accept": "application/vnd.BNM.API.v1+json"},
         )
 
@@ -62,11 +72,12 @@ if __name__ == "__main__":
         logging.error(f"Other error occurred: {err}")
     else:
         logging.debug("Request succeeded")
-        record_exchange_rate_to_file(exchange_rate_file_txt, json.dumps(json_response))
+        record_exchange_rate_to_file(EXCHANGE_RATE_TXT, json.dumps(json_response))
         logging.debug(json_response)
         current_exchange_rate = float(json_response["data"]["rate"])
         if current_exchange_rate >= target_exchange_rate:
-            record_exchange_rate_to_file(exchange_rate_file_txt, f"ALERT!!! TargetExchangeRate={target_exchange_rate},CurrentExchangeRate={current_exchange_rate}")
-            logging.info(
-                f"ALERT!!! TargetExchangeRate={target_exchange_rate},CurrentExchangeRate={current_exchange_rate}"
-            )
+            terminal_alert_message = f"ALERT!!! TargetExchangeRate={target_exchange_rate},CurrentExchangeRate={current_exchange_rate}"
+            notification_alert_message = f"Target Exchange Rate: {target_exchange_rate}\nCurrent Exchange Rate: {current_exchange_rate}"
+            notify_macos("Exchange Rate ALERT!!!", notification_alert_message)
+            record_exchange_rate_to_file(EXCHANGE_RATE_TXT, terminal_alert_message)
+            logging.debug(terminal_alert_message)
